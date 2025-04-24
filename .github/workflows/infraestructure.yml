@@ -1,0 +1,16 @@
+name: terraform-infra
+
+on:
+  workflow_dispatch:
+  push:
+    branhes:
+      -master
+      -feature/infra
+      -infra/dev
+    paths:
+      -"**.tf"
+      -".github/workflows/infraestructure.yml"
+
+
+      
+

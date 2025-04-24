@@ -1,16 +1,50 @@
-name: terraform-infra
+name: Terraform-Infr
 
 on:
   workflow_dispatch:
   push:
-    branhes:
-      -master
-      -feature/infra
-      -infra/dev
+    branches:
+      - master
+      - infra/dev
+      - feature/infra
     paths:
-      -"**.tf"
-      -".github/workflows/infraestructure.yml"
+      - '**/*.tf'
+      - '.github/workflows/infraestructure.yml'
 
+jobs:
+  apply-infra:
+    name: Apply infraestructure
+    runs-on: ubuntu-latest
 
-      
+    steps:
+      # 1. Obtener código
+      - name: Checkout repository
+        uses: actions/checkout@v3                   # Clona tu repo para acceder a los .tf :contentReference[oaicite:0]{index=0}
 
+      # 2. Instalar Terraform
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3          # Instala la versión especificada de Terraform :contentReference[oaicite:1]{index=1}
+        with:
+          terraform_version: 1.11.3
+
+      # 3. Autenticar en Azure
+      - name: Login to Azure
+        uses: azure/login@v1                        # Login con SPN usando el secreto AZURE_CREDENTIALS :contentReference[oaicite:2]{index=2}
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # 4. Inicializar y validar Terraform
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      # 5. Plan de cambios
+      - name: Terraform Plan
+        run: terraform plan -var-file="terraform.tfvars"
+
+      # 6. Aplicar (solo en master)
+      - name: Terraform Apply
+        if: github.ref == 'refs/heads/master'
+        run: terraform apply -auto-approve -var-file="terraform.tfvars"

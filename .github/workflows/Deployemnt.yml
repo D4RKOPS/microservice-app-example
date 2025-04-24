@@ -1,0 +1,54 @@
+name: Deploy to Azure Kubernetes Service
+
+on:
+  push:
+    branches:
+      - main
+      - infra/dev
+      - feature/infra
+
+jobs:
+  build-and-deploy:
+    name: Build & Deploy to AKS
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Clonar el repositorio
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # 2. Autenticación en Azure
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # 3. Login en ACR
+      - name: Azure Container Registry Login
+        uses: azure/docker-login@v2
+        with:
+          login-server: ${{ secrets.AZURE_CONTAINER_REGISTRY }}
+
+      # 4. Build & Push Docker Images
+      - name: Build and push Docker images
+        run: |
+          for dir in ./auth-api ./frontend ./users-api ./todos-api ./log-message-processor; do
+            name=$(basename "$dir")
+            docker build -t "${{ secrets.AZURE_CONTAINER_REGISTRY }}/$name:latest" "$dir"
+            docker push "${{ secrets.AZURE_CONTAINER_REGISTRY }}/$name:latest"
+          done
+
+      # 5. Obtener credenciales de AKS
+      - name: Get AKS credentials
+        run: |
+          az aks get-credentials \
+            --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
+            --name "${{ secrets.AKS_CLUSTER_NAME }}" \
+            --overwrite-existing
+
+      # 6. Desplegar manifiestos en AKS
+      - name: Apply Kubernetes manifests
+        run: |
+          for dir in ./auth-api ./frontend ./users-api ./todos-api ./log-message-processor; do
+            kubectl apply -f "$dir/${dir##*/}-deployment.yml" --namespace microservices
+          done

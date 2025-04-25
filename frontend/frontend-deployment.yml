@@ -16,21 +16,53 @@ spec:
     spec:
       containers:
         - name: frontend
+          # Asegúrate que el pipeline de CI/CD reemplace ':github.sha' con el tag correcto si usas otro
           image: acrformymicroservices20250424/frontend:github.sha
           ports:
-            - containerPort: 80
+            # El containerPort debe coincidir con el puerto donde la aplicación escucha
+            - containerPort: 8080 # <--- Ajustado a 8080
           env:
+            # Variable de entorno para la URL base de la API Gateway
             - name: API_BASE_URL
               value: "http://api-gateway.microservices.svc.cluster.local"
----
+            # --- NUEVAS VARIABLES DE ENTORNO PARA CONFIGURAR LA DIRECCIÓN DE ESCUCHA ---
+            # Establecemos el HOST a 0.0.0.0 para escuchar en todas las interfaces
+            - name: HOST
+              value: "0.0.0.0"
+            # Establecemos el PORT al puerto interno donde la aplicación debe escuchar
+            - name: PORT
+              value: "8080" # <--- Coincide con containerPort y targetPort
+            # --- Fin de NUEVAS VARIABLES DE ENTORNO ---
+          # NOTA: Considera añadir probes de salud (tcpSocket en 8080 es una buena opción)
+          # livenessProbe:
+          #   tcpSocket:
+          #     port: 8080
+          #   initialDelaySeconds: 10
+          #   periodSeconds: 5
+          #   timeoutSeconds: 3
+          #   failureThreshold: 3
+          # readinessProbe:
+          #   tcpSocket:
+          #     port: 8080
+          #   initialDelaySeconds: 15
+          #   periodSeconds: 5
+          #   timeoutSeconds: 3
+          #   failureThreshold: 3
+          # ... otras configuraciones del contenedor si las hay
+--- # Separador de documentos YAML
 apiVersion: v1
 kind: Service
 metadata:
   name: frontend
+  # Asegúrate de que esto coincida con el namespace donde están tus pods
+  namespace: microservices
 spec:
-  type: LoadBalancer
   selector:
-    app: frontend
+    app: frontend # Esto debe coincidir con la etiqueta 'app' en tu YAML de Deployment de frontend
+  type: LoadBalancer # Esto ya estaba correcto para obtener una IP pública
   ports:
+    # El puerto del servicio (externo)
     - port: 80
-      targetPort: 80
+      # El targetPort debe coincidir con el puerto donde la aplicación *realmente* escucha dentro del contenedor
+      targetPort: 8080 # <--- Ajustado a 8080
+      protocol: TCP

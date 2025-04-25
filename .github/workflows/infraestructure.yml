@@ -45,5 +45,5 @@ jobs:
 
       # 6. Aplicar (solo en master)
       - name: Terraform Apply
-        if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/infra/feature/automation'
         run: terraform apply -auto-approve -var-file="terraform.tfvars"

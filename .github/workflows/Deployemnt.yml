@@ -19,61 +19,86 @@ jobs:
       # 1. Clonar repo
       - name: Checkout code
         uses: actions/checkout@v3
+
       # 2. Login a Azure
       - name: Login to Azure
         uses: azure/login@v1
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}  # SPN JSON :contentReference[oaicite:5]{index=5}
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
       # 3. Obtener credenciales AKS
       - name: Get AKS credentials
         run: |
+          az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           az aks get-credentials \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
             --name ${{ secrets.AKS_CLUSTER_NAME }} \
-            --overwrite-existing           # configura kubectl :contentReference[oaicite:6]{index=6}
-      # 4. Login en ACR
+            --overwrite-existing
+
+      # 4. Login en ACR (usando loginServer)
       - name: Azure Container Registry Login
-        run: az acr login --name ${{ secrets.AZURE_CONTAINER_REGISTRY }} # Docker login :contentReference[oaicite:7]{index=7}
-      # 5. Extraer clave Redis y crear Secret
+        run: |
+          az acr login --name ${{ secrets.AZURE_CONTAINER_REGISTRY_NAME }}
+
+      # 5. Extraer clave Redis y crear Secret dinámicamente
       - name: Get Redis Primary Key
         id: redis-key
         run: |
           REDIS_KEY=$(az redis list-keys \
-            --name microservices-redis20250424 \
-            --resource-group microservices-rg \
-            --query "primaryKey" -o tsv)
+            --name ${{ secrets.AZURE_REDIS_NAME }} \
+            --resource-group ${{ secrets.AZURE_REDIS_RG }} \
+            --query primaryKey -o tsv)
           echo "::add-mask::$REDIS_KEY"
           echo "REDIS_PASSWORD=$REDIS_KEY" >> $GITHUB_ENV
+
       - name: Create Redis Secret
         run: |
           kubectl create secret generic redis-secret \
             --namespace microservices \
             --from-literal=REDIS_PASSWORD="$REDIS_PASSWORD" \
-            --dry-run=client -o yaml | kubectl apply -f -  # Opaque Secret :contentReference[oaicite:8]{index=8}
-      # 6. Build & Push Imágenes
+            --dry-run=client -o yaml \
+          | kubectl apply -f -
+
+      # 6. Build & Push Imágenes a ACR
       - name: Build and push Docker images
         run: |
           for dir in ./auth-api ./frontend ./users-api ./todos-api ./log-message-processor; do
-            name=$(basename $dir)
-            docker build -t ${{ secrets.AZURE_CONTAINER_REGISTRY }}/$name:${{ env.IMAGE_TAG }} $dir
-            docker push ${{ secrets.AZURE_CONTAINER_REGISTRY }}/$name:${{ env.IMAGE_TAG }}
-          done                                          # construye y empuja :contentReference[oaicite:9]{index=9}
-      # 7. Actualizar etiquetas en manifiestos
+            svc=$(basename $dir)
+            docker build -t ${{ secrets.AZURE_CONTAINER_REGISTRY }}/$svc:${{ env.IMAGE_TAG }} $dir
+            docker push    ${{ secrets.AZURE_CONTAINER_REGISTRY }}/$svc:${{ env.IMAGE_TAG }}
+          done
+
+      # 7. Injectar IMAGE_TAG en los Deployment YAML
       - name: Replace image tag in manifests
         run: |
           for dir in ./auth-api ./frontend ./users-api ./todos-api ./log-message-processor; do
-            sed -i "s|image: .*:.*|image: ${{ secrets.AZURE_CONTAINER_REGISTRY }}/$(basename $dir):${{ env.IMAGE_TAG }}|" \
-              $dir/${dir##*/}-deployment.yml           # sed con delimitador | :contentReference[oaicite:10]{index=10}
+            svc=$(basename $dir)
+            sed -i \
+              "s|image: .*:.*|image: ${{ secrets.AZURE_CONTAINER_REGISTRY }}/$svc:${{ env.IMAGE_TAG }}|" \
+              $dir/${svc}-deployment.yml
           done
+
       # 8. Aplicar manifiestos en AKS
       - name: Apply Kubernetes manifests
         run: |
           for dir in ./auth-api ./frontend ./users-api ./todos-api ./log-message-processor; do
-            kubectl apply -f $dir/${dir##*/}-deployment.yml --namespace microservices
-          done                                          # kubectl apply :contentReference[oaicite:11]{index=11}
-      # 9. Reiniciar despliegues (rollout restart)
-      - name: Rollout restart (optional)
+            svc=$(basename $dir)
+            kubectl apply -f $dir/${svc}-deployment.yml \
+              --namespace microservices
+          done
+
+      # 9. Rollout restart (refuerzo)
+      - name: Rollout restart deployments
         run: |
           for app in auth-api frontend users-api todos-api log-message-processor; do
-            kubectl rollout restart deployment $app --namespace microservices
-          done                                          # reinicia sin downtime :contentReference[oaicite:12]{index=12}
+            kubectl rollout restart deployment $app \
+              --namespace microservices
+          done
+
+      # 10. Mostrar External-IP del frontend
+      - name: Show Frontend External IP
+        run: |
+          IP=$(kubectl get svc frontend \
+               -n microservices \
+               -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+          echo "🚀 Frontend available at http://$IP"

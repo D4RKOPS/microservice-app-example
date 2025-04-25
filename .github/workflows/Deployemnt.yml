@@ -3,52 +3,75 @@ name: Deploy to Azure Kubernetes Service
 on:
   push:
     branches:
-      - main
+      - master
       - infra/dev
-      - feature/infra
+
+env:
+  IMAGE_TAG: ${{ github.sha }}
 
 jobs:
   build-and-deploy:
-    name: Build & Deploy to AKS
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Clonar el repositorio
+      # 1. Clonar repo
       - name: Checkout code
         uses: actions/checkout@v3
-
-      # 2. Autenticación en Azure
+      # 2. Login a Azure
       - name: Login to Azure
         uses: azure/login@v1
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-      # 3. Login en ACR
-      - name: Azure Container Registry Login
-        uses: azure/docker-login@v2
-        with:
-          login-server: ${{ secrets.AZURE_CONTAINER_REGISTRY }}
-
-      # 4. Build & Push Docker Images
-      - name: Build and push Docker images
-        run: |
-          for dir in ./auth-api ./frontend ./users-api ./todos-api ./log-message-processor; do
-            name=$(basename "$dir")
-            docker build -t "${{ secrets.AZURE_CONTAINER_REGISTRY }}/$name:latest" "$dir"
-            docker push "${{ secrets.AZURE_CONTAINER_REGISTRY }}/$name:latest"
-          done
-
-      # 5. Obtener credenciales de AKS
+          creds: ${{ secrets.AZURE_CREDENTIALS }}  # SPN JSON :contentReference[oaicite:5]{index=5}
+      # 3. Obtener credenciales AKS
       - name: Get AKS credentials
         run: |
           az aks get-credentials \
-            --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
-            --name "${{ secrets.AKS_CLUSTER_NAME }}" \
-            --overwrite-existing
-
-      # 6. Desplegar manifiestos en AKS
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --name ${{ secrets.AKS_CLUSTER_NAME }} \
+            --overwrite-existing           # configura kubectl :contentReference[oaicite:6]{index=6}
+      # 4. Login en ACR
+      - name: Azure Container Registry Login
+        run: az acr login --name ${{ secrets.AZURE_CONTAINER_REGISTRY }} # Docker login :contentReference[oaicite:7]{index=7}
+      # 5. Extraer clave Redis y crear Secret
+      - name: Get Redis Primary Key
+        id: redis-key
+        run: |
+          REDIS_KEY=$(az redis list-keys \
+            --name microservices-redis \
+            --resource-group microservices-rg \
+            --query "primaryKey" -o tsv)
+          echo "::add-mask::$REDIS_KEY"
+          echo "REDIS_PASSWORD=$REDIS_KEY" >> $GITHUB_ENV
+      - name: Create Redis Secret
+        run: |
+          kubectl create secret generic redis-secret \
+            --namespace microservices \
+            --from-literal=REDIS_PASSWORD="$REDIS_PASSWORD" \
+            --dry-run=client -o yaml | kubectl apply -f -  # Opaque Secret :contentReference[oaicite:8]{index=8}
+      # 6. Build & Push Imágenes
+      - name: Build and push Docker images
+        run: |
+          for dir in ./auth-api ./frontend ./users-api ./todos-api ./log-message-processor; do
+            name=$(basename $dir)
+            docker build -t ${{ secrets.AZURE_CONTAINER_REGISTRY }}/$name:${{ env.IMAGE_TAG }} $dir
+            docker push ${{ secrets.AZURE_CONTAINER_REGISTRY }}/$name:${{ env.IMAGE_TAG }}
+          done                                          # construye y empuja :contentReference[oaicite:9]{index=9}
+      # 7. Actualizar etiquetas en manifiestos
+      - name: Replace image tag in manifests
+        run: |
+          for dir in ./auth-api ./frontend ./users-api ./todos-api ./log-message-processor; do
+            sed -i "s|image: .*:.*|image: ${{ secrets.AZURE_CONTAINER_REGISTRY }}/$(basename $dir):${{ env.IMAGE_TAG }}|" \
+              $dir/${dir##*/}-deployment.yml           # sed con delimitador | :contentReference[oaicite:10]{index=10}
+          done
+      # 8. Aplicar manifiestos en AKS
       - name: Apply Kubernetes manifests
         run: |
           for dir in ./auth-api ./frontend ./users-api ./todos-api ./log-message-processor; do
-            kubectl apply -f "$dir/${dir##*/}-deployment.yml" --namespace microservices
-          done
+            kubectl apply -f $dir/${dir##*/}-deployment.yml --namespace microservices
+          done                                          # kubectl apply :contentReference[oaicite:11]{index=11}
+      # 9. Reiniciar despliegues (rollout restart)
+      - name: Rollout restart (optional)
+        run: |
+          for app in auth-api frontend users-api todos-api log-message-processor; do
+            kubectl rollout restart deployment $app --namespace microservices
+          done                                          # reinicia sin downtime :contentReference[oaicite:12]{index=12}

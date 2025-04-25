@@ -9,6 +9,10 @@ on:
       - feature/infra
       - infra/feature/automation
 
+    paths:
+      - '**/*.tf'
+      - '.github/workflows/infraestructure.yml' 
+
 jobs:
   apply-infra:
     name: Apply infrastructure

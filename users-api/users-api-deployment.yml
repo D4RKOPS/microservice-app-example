@@ -15,50 +15,43 @@ spec:
     spec:
       containers:
         - name: users-api
-          # Asegúrate que el pipeline de CI/CD reemplace ':latest' con el tag correcto (ej: github.sha)
-          # Usar github.sha es correcto si tu pipeline lo inyecta
           image: acrformymicroservices-test.azurecr.io/users-api:github.sha
-          imagePullPolicy: Always # Puede ser útil para desarrollo, pero considera 'IfNotPresent' o eliminarla en producción
+          imagePullPolicy: Always
           ports:
-            - containerPort: 8083 # El puerto donde la aplicación Spring Boot escucha
+            - containerPort: 8083
           env:
-            # --- JWT_SECRET: Corregido el error de sintaxis y usando valueFrom ---
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: users-api-secrets # Nombre del Secret de Kubernetes
-                  key: JWT_SECRET      # Clave dentro del Secret (sin caracteres extra)
-            # --- SERVER_PORT: Re-agregado ---
+                  name: users-api-secrets
+                  key: JWT_SECRET
             - name: SERVER_PORT
-              value: "8083" # El valor debe ser el puerto donde la aplicación escucha
-            # --- Probes ajustadas para usar tcpSocket (ya estaban correctas) ---
-            livenessProbe: # Chequeo de vida: ¿Está la aplicación 'viva'?
-              tcpSocket:
-                port: 8083 # Verifica si se puede establecer una conexión TCP al puerto 8083
-              initialDelaySeconds: 15 # Tiempo inicial de espera antes del primer chequeo (ajusta si es necesario)
-              periodSeconds: 10       # Frecuencia de los chequeos
-              timeoutSeconds: 2       # Tiempo máximo para que la conexión se establezca
-              failureThreshold: 3     # Número de fallos consecutivos antes de considerar el pod no saludable
-            readinessProbe: # Chequeo de preparación: ¿Está la aplicación lista para recibir tráfico?
-              tcpSocket:
-                port: 8083 # Verifica si se puede establecer una conexión TCP al puerto 8083
-              initialDelaySeconds: 5 # Tiempo inicial de espera (suele ser un poco más que liveness)
-              periodSeconds: 10
-              timeoutSeconds: 2
-              failureThreshold: 3
-            # --- Fin de las probes ajustadas ---
-            # ... otras configuraciones del contenedor si las hay
---- # Separador de documentos YAML
+              value: "8083"
+          livenessProbe:
+            tcpSocket:
+              port: 8083
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          readinessProbe:
+            tcpSocket:
+              port: 8083
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+---
 apiVersion: v1
 kind: Service
 metadata:
   name: users-api
-  namespace: microservices # Correcto
+  namespace: microservices
 spec:
   selector:
     app: users-api
   ports:
     - protocol: TCP
-      port: 8083 # Puerto del servicio (interno)
-      targetPort: 8083 # Puerto del contenedor al que el servicio redirige el tráfico
-  type: ClusterIP # Correcto para comunicación interna
+      port: 8083
+      targetPort: 8083
+  type: ClusterIP

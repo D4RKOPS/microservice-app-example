@@ -41,7 +41,7 @@ jobs:
 
       # 5. Plan de cambios
       - name: Terraform Plan
-        run: terraform plan -var-file="terraform.tfvars"
+        run: terraform plan 
 
       # 6. Aplicar (solo en master)
       - name: Terraform Apply

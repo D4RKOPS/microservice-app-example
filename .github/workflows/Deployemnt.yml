@@ -39,7 +39,7 @@ jobs:
         id: redis-key
         run: |
           REDIS_KEY=$(az redis list-keys \
-            --name microservices-redis \
+            --name microservices-redis20250424 \
             --resource-group microservices-rg \
             --query "primaryKey" -o tsv)
           echo "::add-mask::$REDIS_KEY"

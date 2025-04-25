@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: auth-api
-          image: <ACR_LOGIN_SERVER>/auth-api:<IMAGE_TAG>
+          image: acrformymicroservices20250424.azurecr.io/auth-api:github.sha
           ports:
             - containerPort: 8080
           env:

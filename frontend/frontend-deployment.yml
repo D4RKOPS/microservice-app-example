@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: <ACR_LOGIN_SERVER>/frontend:<IMAGE_TAG>
+          image: acrformymicroservices20250424/frontend:github.sha
           ports:
             - containerPort: 80
           env:

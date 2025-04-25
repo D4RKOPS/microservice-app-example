@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: todos-api
-          image: <ACR_LOGIN_SERVER>/todos-api:<IMAGE_TAG>
+          image: acrformymicroservices20250424/todos-api:github.sha
           ports:
             - containerPort: 4000
           env:

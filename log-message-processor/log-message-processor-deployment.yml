@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: log-message-processor
-          image: <ACR_LOGIN_SERVER>/log-message-processor:<IMAGE_TAG>
+          image: acrformymicroservices20250424.azurecr.io/log-message-processor:github.sha
           env:
             - name: REDIS_HOST
               value: "redis-master.microservices.svc.cluster.local"

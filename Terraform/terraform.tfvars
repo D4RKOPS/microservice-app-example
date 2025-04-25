@@ -1,0 +1,13 @@
+subscription_id      = "0e253c24-1ee3-4d78-a9e9-271989d8815b"
+resource_group_name  = "microservices-rg"
+location             = "East US"
+acr_name             = "acrformymicroservices20250424"
+aks_name             = "microservices-aks"
+aks_node_count       = 1
+aks_node_vm_size     = "Standard_B2ms"
+redis_name           = "microservices-redis20250424"
+apim_name            = "microservices-apim20250424"
+apim_publisher_name  = "Microservices Inc."
+apim_publisher_email = "admin@microservices.com"
+kubeconfig_path      = "kubeconfig.yaml"
+k8s_namespace        = "microservices"

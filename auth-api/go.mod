@@ -1,6 +1,6 @@
 module github.com/CrisDelCast/microservice-app-example/auth-api
 
-go 1.24.2
+go 1.24
 
 require (
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible

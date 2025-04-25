@@ -13,11 +13,11 @@ terraform {
 
 provider "azurerm" {
   subscription_id = var.subscription_id
-  features {}  # Provider AzureRM debe declarar features {} para habilitar funcionalidades :contentReference[oaicite:0]{index=0}
+  features {} # Provider AzureRM debe declarar features {} para habilitar funcionalidades
 }
 
 provider "kubernetes" {
-  config_path = var.kubeconfig_path  # Ruta a tu kubeconfig local :contentReference[oaicite:1]{index=1}
+  config_path = var.kubeconfig_path # Ruta a tu kubeconfig local
 }
 
 # Resource Group
@@ -25,6 +25,7 @@ resource "azurerm_resource_group" "microservices_rg" {
   name     = var.resource_group_name
   location = var.location
 }
+
 # Azure Container Registry
 resource "azurerm_container_registry" "acr" {
   name                = var.acr_name
@@ -33,6 +34,7 @@ resource "azurerm_container_registry" "acr" {
   sku                 = "Standard"
   admin_enabled       = true
 }
+
 # Azure Kubernetes Service
 resource "azurerm_kubernetes_cluster" "aks_cluster" {
   name                = var.aks_name
@@ -55,15 +57,7 @@ resource "azurerm_kubernetes_cluster" "aks_cluster" {
     network_plugin = "azure"
   }
 }
-# Redis Cache como cola de mensajes
-resource "azurerm_redis_cache" "redis_queue" {
-  name                = var.redis_name
-  location            = azurerm_resource_group.microservices_rg.location
-  resource_group_name = azurerm_resource_group.microservices_rg.name
-  capacity            = 2
-  family              = "C"
-  sku_name            = "Standard"
-}
+
 # API Management
 resource "azurerm_api_management" "apim" {
   name                = var.apim_name
@@ -73,9 +67,13 @@ resource "azurerm_api_management" "apim" {
   publisher_email     = var.apim_publisher_email
   sku_name            = "Developer_1"
 }
+
 # Namespace en Kubernetes
 resource "kubernetes_namespace" "microservices_ns" {
   metadata {
     name = var.k8s_namespace
   }
 }
+
+# El recurso azurerm_redis_cache.redis_queue ha sido eliminado.
+# Si tu aplicación depende de esta instancia de Redis, su eliminación afectará la funcionalidad.

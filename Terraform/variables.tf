@@ -40,12 +40,6 @@ variable "aks_node_vm_size" {
   default     = "Standard_B2ms"
 }
 
-variable "redis_name" {
-  description = "Name of the Azure Redis Cache instance"
-  type        = string
-  default     = "microservices-redis20250424"
-}
-
 variable "apim_name" {
   description = "Name of the Azure API Management service"
   type        = string

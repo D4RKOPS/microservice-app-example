@@ -5,7 +5,6 @@ acr_name             = "acrformymicroservices20250424"
 aks_name             = "microservices-aks"
 aks_node_count       = 1
 aks_node_vm_size     = "Standard_B2ms"
-redis_name           = "microservices-redis20250424"
 apim_name            = "microservices-apim20250424"
 apim_publisher_name  = "Microservices Inc."
 apim_publisher_email = "admin@microservices.com"

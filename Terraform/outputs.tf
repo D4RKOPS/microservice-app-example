@@ -13,11 +13,6 @@ output "aks_cluster_name" {
   value       = azurerm_kubernetes_cluster.aks_cluster.name
 }
 
-output "redis_hostname" {
-  description = "Hostname of the Azure Redis Cache instance"
-  value       = azurerm_redis_cache.redis_queue.hostname
-}
-
 output "apim_gateway_url" {
   description = "Gateway URL for the Azure API Management instance"
   value       = azurerm_api_management.apim.gateway_url

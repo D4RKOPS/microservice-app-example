@@ -74,3 +74,6 @@ jobs:
           for app in auth-api frontend users-api todos-api log-message-processor; do
             kubectl rollout restart deployment $app --namespace microservices
           done
+
+      - name: List all pods in microservices namespace
+        run: kubectl get pods -n microservices

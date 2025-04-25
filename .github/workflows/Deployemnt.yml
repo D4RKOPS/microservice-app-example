@@ -6,141 +6,97 @@ on:
       - master
       - infra/dev
       - feature/infra
-      - infra/feature/automation # Asumiendo que esta es una rama de feature para probar la infra
+      - infra/feature/automation
 
 env:
-  IMAGE_TAG: ${{ github.sha }} # Usa el SHA del commit como tag de la imagen
+  IMAGE_TAG: ${{ github.sha }}
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
+    env:
+      IMAGE_TAG: ${{ github.sha }}
+
     steps:
-      # 1. Clonar repo
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 2. Login a Azure (usando un Service Principal configurado en Secrets)
+      # 2. Login a Azure
       - name: Login to Azure
         uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }} # Secret con la info del Service Principal
 
-      # 3. Obtener credenciales AKS y configurar kubectl
+      # 3. Obtener credenciales AKS  
       - name: Get AKS credentials
         run: |
-          # Establece la suscripción activa
           az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          # Obtiene las credenciales del clúster AKS y las guarda en el archivo de configuración de kubectl
-          # --overwrite-existing asegura que se actualice si ya existe
           az aks get-credentials \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
             --name ${{ secrets.AKS_CLUSTER_NAME }} \
             --overwrite-existing
 
-      # 4. Login en ACR (usando la identidad de Azure logueada en el paso 2)
+      # 4. Login en ACR (usando loginServer)
       - name: Azure Container Registry Login
         run: |
-          # Loguea en ACR usando la identidad de Azure. ${{ secrets.AZURE_CONTAINER_REGISTRY_NAME }} debe ser el nombre de tu ACR
           az acr login --name ${{ secrets.AZURE_CONTAINER_REGISTRY_NAME }}
 
-      # 5. Asegurar que el Namespace de Kubernetes exista
-      # Es necesario antes de crear Secrets o Deployments en él
-      - name: Ensure Kubernetes Namespace exists
+      # 5. Extraer clave Redis y crear Secret dinámicamente
+      - name: Get Redis Primary Key
+        id: redis-key
         run: |
-          # Intenta crear el namespace, si ya existe, kubectl lo ignora gracias a apply -f -
-          echo "apiVersion: v1
-          kind: Namespace
-          metadata:
-            name: microservices" | kubectl apply -f -
-                    echo "Namespace 'microservices' ensured."
-
-
-      # 6. Extraer clave Redis y crear Secret dinámicamente
-      - name: Get Redis Primary Key and Create Secret
-        id: redis-key # Usaremos este ID para referenciar las salidas de este paso
-        run: |
-          # Obtiene la clave primaria de Redis de Azure
           REDIS_KEY=$(az redis list-keys \
-            --name ${{ secrets.AZURE_REDIS_NAME }} \ # Nombre del recurso Redis en Azure
-            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \ # RG donde está Redis (asumiendo que es el mismo RG general)
+            --name ${{ secrets.AZURE_REDIS_NAME }} \
+            --resource-group ${{ secrets.AZURE_REDIS_RG }} \
             --query primaryKey -o tsv)
-
-          # Enmascara la clave en los logs para seguridad
           echo "::add-mask::$REDIS_KEY"
 
-          # Establece la clave como variable de entorno para usarla en pasos posteriores
-          echo "REDIS_PASSWORD=$REDIS_KEY" >> $GITHUB_ENV
 
-          # Crea la definición del Secret de Kubernetes en YAML y la aplica
-          # --dry-run=client -o yaml genera el YAML sin aplicarlo directamente
-          # | kubectl apply -f - toma el YAML generado y lo aplica via stdin
-          kubectl create secret generic redis-secret \
-            --namespace microservices \
-            --from-literal=REDIS_PASSWORD="$REDIS_PASSWORD" \
-            --dry-run=client -o yaml \
-          | kubectl apply -f -
-
-      # 7. Build & Push Imágenes Docker a ACR
+      # 6. Build & Push Imágenes a ACR
       - name: Build and push Docker images
         run: |
           # Recorre los directorios de los servicios
           for dir in ./auth-api ./frontend ./users-api ./todos-api ./log-message-processor; do
-            svc=$(basename $dir) # Extrae el nombre del servicio del nombre del directorio
-            # Construye la imagen, tageándola con el login server de ACR y el tag del commit
+            svc=$(basename $dir)
             docker build -t ${{ secrets.AZURE_CONTAINER_REGISTRY }}/$svc:${{ env.IMAGE_TAG }} $dir
-            # Sube la imagen a ACR
             docker push    ${{ secrets.AZURE_CONTAINER_REGISTRY }}/$svc:${{ env.IMAGE_TAG }}
           done
 
-      # 8. Injectar IMAGE_TAG y ACR name en los Deployment YAML
-      - name: Replace image in manifests
+      # 7. Injectar IMAGE_TAG en los Deployment YAML
+      - name: Replace image tag in manifests
         run: |
           # Recorre los directorios de los servicios
           for dir in ./auth-api ./frontend ./users-api ./todos-api ./log-message-processor; do
-            svc=$(basename $dir) # Extrae el nombre del servicio
-            # Usa sed para reemplazar la línea 'image: ...' con la imagen tageada correctamente
-            # Asegúrate de que tus archivos de deployment se llamen ${svc}-deployment.yml dentro de cada directorio de servicio
+            svc=$(basename $dir)
             sed -i \
               "s|image: .*:.*|image: ${{ secrets.AZURE_CONTAINER_REGISTRY }}/$svc:${{ env.IMAGE_TAG }}|" \
               $dir/${svc}-deployment.yml
           done
 
-      # 9. Aplicar manifiestos en AKS
+      # 8. Aplicar manifiestos en AKS
       - name: Apply Kubernetes manifests
         run: |
           # Recorre los directorios de los servicios
           for dir in ./auth-api ./frontend ./users-api ./todos-api ./log-message-processor; do
-            svc=$(basename $dir) # Extrae el nombre del servicio
-            # Aplica el archivo de deployment modificado al namespace correcto en AKS
+            svc=$(basename $dir)
             kubectl apply -f $dir/${svc}-deployment.yml \
               --namespace microservices
           done
 
-      # 10. Rollout restart (refuerzo)
-      # A veces es útil forzar un reinicio para asegurar que los pods tomen la nueva imagen
+      # 9. Rollout restart (refuerzo)
       - name: Rollout restart deployments
         run: |
           # Recorre los nombres de las aplicaciones (deben coincidir con los nombres de los deployments en los YAMLs)
           for app in auth-api frontend users-api todos-api log-message-processor; do
-            # Reinicia el deployment específico en el namespace
             kubectl rollout restart deployment $app \
               --namespace microservices
           done
 
-      # 11. Mostrar External-IP del frontend
-      # Espera un momento a que se asigne la IP y la muestra (puede tardar un poco)
+      # 10. Mostrar External-IP del frontend
       - name: Show Frontend External IP
         run: |
-          # Espera a que el servicio 'frontend' tenga una IP externa asignada
-          kubectl wait --namespace microservices \
-            --for=condition=LoadBalancerInGressReady service frontend \
-            --timeout=5m
-
-          # Obtiene la IP externa del servicio 'frontend'
           IP=$(kubectl get svc frontend \
                -n microservices \
                -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-
-          # Imprime la URL de acceso
           echo "🚀 Frontend available at http://$IP"

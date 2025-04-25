@@ -1,32 +1,37 @@
-  apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    name: users-api
-    namespace: microservices
-  spec:
-    replicas: 2
-    selector:
-      matchLabels:
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: users-api
+  namespace: microservices # Correcto
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: users-api
+  template:
+    metadata:
+      labels:
         app: users-api
-    template:
-      metadata:
-        labels:
-          app: users-api
-      spec:
-        containers:
-          - name: users-api
-            # Asegúrate que el pipeline de CI/CD reemplace ':latest' con el tag correcto (ej: github.sha)
-            image: acrformymicroservices-test.azurecr.io/users-api:github.sha
-            imagePullPolicy: Always # Puede ser útil para desarrollo, pero considera 'IfNotPresent' o eliminarla en producción
-            ports:
-              - containerPort: 8083 # El puerto donde la aplicación Spring Boot escucha
-            env:
+    spec:
+      containers:
+        - name: users-api
+          # Asegúrate que el pipeline de CI/CD reemplace ':latest' con el tag correcto (ej: github.sha)
+          # Usar github.sha es correcto si tu pipeline lo inyecta
+          image: acrformymicroservices-test.azurecr.io/users-api:github.sha
+          imagePullPolicy: Always # Puede ser útil para desarrollo, pero considera 'IfNotPresent' o eliminarla en producción
+          ports:
+            - containerPort: 8083 # El puerto donde la aplicación Spring Boot escucha
+          env:
+            # --- JWT_SECRET: Corregido el error de sintaxis y usando valueFrom ---
             - name: JWT_SECRET
-              valueFrom: # <--- Usar valueFrom
+              valueFrom:
                 secretKeyRef:
-                  name: users-api-secrets # <--- Nombre del Secret (ejemplo)
-                  key: JWT_SECRET      # <-
-            # --- Probes ajustadas para usar tcpSocket ---
+                  name: users-api-secrets # Nombre del Secret de Kubernetes
+                  key: JWT_SECRET      # Clave dentro del Secret (sin caracteres extra)
+            # --- SERVER_PORT: Re-agregado ---
+            - name: SERVER_PORT
+              value: "8083" # El valor debe ser el puerto donde la aplicación escucha
+            # --- Probes ajustadas para usar tcpSocket (ya estaban correctas) ---
             livenessProbe: # Chequeo de vida: ¿Está la aplicación 'viva'?
               tcpSocket:
                 port: 8083 # Verifica si se puede establecer una conexión TCP al puerto 8083
@@ -43,17 +48,17 @@
               failureThreshold: 3
             # --- Fin de las probes ajustadas ---
             # ... otras configuraciones del contenedor si las hay
-  --- # Separador de documentos YAML
-  apiVersion: v1
-  kind: Service
-  metadata:
-    name: users-api
-    namespace: microservices
-  spec:
-    selector:
-      app: users-api
-    ports:
-      - protocol: TCP
-        port: 8083 # Puerto del servicio
-        targetPort: 8083 # Puerto del contenedor al que el servicio redirige el tráfico
-    type: ClusterIP # O LoadBalancer si necesitas acceso externo directo
+--- # Separador de documentos YAML
+apiVersion: v1
+kind: Service
+metadata:
+  name: users-api
+  namespace: microservices # Correcto
+spec:
+  selector:
+    app: users-api
+  ports:
+    - protocol: TCP
+      port: 8083 # Puerto del servicio (interno)
+      targetPort: 8083 # Puerto del contenedor al que el servicio redirige el tráfico
+  type: ClusterIP # Correcto para comunicación interna

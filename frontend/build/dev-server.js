@@ -14,6 +14,14 @@ var webpackConfig = require('./webpack.dev.conf')
 
 // default port where dev server listens for incoming traffic
 var port = process.env.PORT || config.dev.port || 8080
+
+// --- NUEVA LÍNEA: Lee la variable de entorno HOST ---
+// Usa 0.0.0.0 por defecto si HOST no está definida (para K8s)
+// o usa 'localhost' si NODE_ENV no está definido (para desarrollo local)
+var host = process.env.HOST || (process.env.NODE_ENV ? '0.0.0.0' : 'localhost');
+// --- Fin NUEVA LÍNEA ---
+
+
 // automatically open browser, if not set will be false
 var autoOpenBrowser = !!config.dev.autoOpenBrowser
 // Define HTTP proxies to your custom API backend
@@ -46,6 +54,9 @@ Object.keys(proxyTable).forEach(function (context) {
   if (typeof options === 'string') {
     options = { target: options }
   }
+  // Aquí es donde se configuran los proxies. Asegúrate de que
+  // la URL base del proxy apunte a API_BASE_URL (esto no se configura aquí,
+  // sino donde se define proxyTable, probablemente en config/index.js)
   app.use(proxyMiddleware(options.filter || context, options))
 })
 
@@ -63,7 +74,9 @@ app.use(hotMiddleware)
 var staticPath = path.posix.join(config.dev.assetsPublicPath, config.dev.assetsSubDirectory)
 app.use(staticPath, express.static('./static'))
 
-var uri = 'http://127.0.0.1:' + port
+// --- LÍNEA MODIFICADA: Usa la variable 'host' en lugar de 127.0.0.1 ---
+var uri = 'http://' + host + ':' + port
+// --- Fin LÍNEA MODIFICADA ---
 
 var _resolve
 var readyPromise = new Promise(resolve => {
@@ -72,15 +85,21 @@ var readyPromise = new Promise(resolve => {
 
 console.log('> Starting dev server...')
 devMiddleware.waitUntilValid(() => {
+  // El mensaje de log ahora reflejará el host real (0.0.0.0 en K8s)
   console.log('> Listening at ' + uri + '\n')
   // when env is testing, don't need open it
   if (autoOpenBrowser && process.env.NODE_ENV !== 'testing') {
+    // Si HOST es 0.0.0.0, opn podría no funcionar correctamente.
+    // Podrías necesitar una lógica aquí para usar 'localhost' para opn
+    // si HOST es 0.0.0.0.
     opn(uri)
   }
   _resolve()
 })
 
-var server = app.listen(port)
+// --- LÍNEA MODIFICADA: Pasa la variable 'host' a app.listen ---
+var server = app.listen(port, host)
+// --- Fin LÍNEA MODIFICADA ---
 
 module.exports = {
   ready: readyPromise,

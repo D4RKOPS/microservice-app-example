@@ -5,6 +5,7 @@ on:
     branches:
       - master
       - infra/dev
+      - infra/feature/automation
 
 jobs:
   build-and-deploy:

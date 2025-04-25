@@ -2,8 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: users-api
-  labels:
-    app: users-api
+  namespace: microservices
 spec:
   replicas: 2
   selector:
@@ -16,24 +15,42 @@ spec:
     spec:
       containers:
         - name: users-api
-          image: acrformymicroservices20250424/users-api:github.sha
+          image: acrformymicroservices-test.azurecr.io/users-api:latest
+          imagePullPolicy: Always
           ports:
-            - containerPort: 3000
+            - containerPort: 8083
           env:
-            - name: DATABASE_URL
-              valueFrom:
-                secretKeyRef:
-                  name: users-db-secret
-                  key: DATABASE_URL
+            - name: JWT_SECRET
+              value: "PRFT"
+            - name: SERVER_PORT
+              value: "8083"
+          livenessProbe:
+            httpGet:
+              path: /users/health
+              port: 8083
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /users/health
+              port: 8083
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: users-api
+  namespace: microservices
 spec:
-  type: ClusterIP
   selector:
     app: users-api
   ports:
-    - port: 80
-      targetPort: 3000
+    - protocol: TCP
+      port: 8083
+      targetPort: 8083
+  type: ClusterIP

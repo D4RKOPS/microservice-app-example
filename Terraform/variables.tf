@@ -46,6 +46,12 @@ variable "apim_name" {
   default     = "microservices-apim20250424"
 }
 
+variable "redis_name" {
+  description = "Name of the Azure Redis Cache instance"
+  type        = string
+  default     = "microservices-redis20250424"
+}
+
 variable "apim_publisher_name" {
   description = "Publisher name for API Management"
   type        = string

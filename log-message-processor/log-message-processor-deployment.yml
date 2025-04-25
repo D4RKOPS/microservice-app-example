@@ -15,32 +15,27 @@ spec:
     spec:
       containers:
         - name: log-message-processor
-          # Asegúrate que el pipeline de CI/CD reemplace ':latest' con el tag correcto (ej: github.sha)
           image: acrformymicroservices-test.azurecr.io/log-message-processor:latest
-          imagePullPolicy: Always # Puede ser útil para desarrollo, pero considera 'IfNotPresent' o eliminarla en producción
-          # Variables de entorno relacionadas con Redis eliminadas
-          # env:
-          #   - name: REDIS_HOST
-          #     value: "microservices-redis.redis.cache.windows.net"
-          #   - name: REDIS_PORT
-          #     value: "6379"
-          #   - name: REDIS_CHANNEL
-          #     value: "log_channel"
-          #   - name: REDIS_PASSWORD
-          #     valueFrom:
-          #       secretKeyRef:
-          #         name: redis-secret
-          #         key: REDIS_PASSWORD
+          imagePullPolicy: Always
+          env:
+            - name: REDIS_HOST
+              value: "microservices-redis.redis.cache.windows.net"
+            - name: REDIS_PORT
+              value: "6379"
+            - name: REDIS_CHANNEL
+              value: "log_channel"
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-secret
+                  key: REDIS_PASSWORD
           resources:
             limits:
               memory: "128Mi"
               cpu: "250m"
-          # NOTA: Considera añadir probes de salud si la aplicación expone un puerto o comando de salud
-          # livenessProbe:
-          #   ...
-          # readinessProbe:
-          #   ...
---- # Separador de documentos YAML
+          imagePullPolicy: Always
+      restartPolicy: Always
+---
 apiVersion: v1
 kind: Service
 metadata:
@@ -50,9 +45,7 @@ spec:
   selector:
     app: log-message-processor
   ports:
-    # Si este servicio no expone un puerto para ser accedido por otros servicios,
-    # este bloque de puertos podría no ser necesario.
     - protocol: TCP
       port: 5000
-      targetPort: 5000 # Asegúrate de que este sea el puerto donde la aplicación escucha internamente si expone uno
-  type: ClusterIP # O None si no necesita un ClusterIP estable
+      targetPort: 5000
+  type: ClusterIP

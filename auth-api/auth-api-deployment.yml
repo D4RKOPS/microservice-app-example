@@ -27,11 +27,10 @@ spec:
                 secretKeyRef:
                   name: auth-api-secrets # Nombre del Secret de Kubernetes
                   key: JWT_SECRET      # Clave dentro del Secret
-            # --- NUEVA VARIABLE DE ENTORNO ---
-            # Intentamos sobrescribir la dirección de escucha usando la variable PORT
-            # La aplicación debería escuchar en todas las interfaces en el puerto 8080
-            - name: PORT
-              value: "8080"
+            # --- NUEVA VARIABLE DE ENTORNO CRÍTICA ---
+            # Establecemos la variable que la aplicación lee para el puerto
+            - name: AUTH_API_PORT
+              value: "8080" # <-- El valor debe ser solo el número del puerto
             # --- Fin de NUEVA VARIABLE DE ENTORNO ---
           # NOTA: Considera añadir probes de salud (tcpSocket es una buena opción si no puedes modificar el código)
           # livenessProbe:

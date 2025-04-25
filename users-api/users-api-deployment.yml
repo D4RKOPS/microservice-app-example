@@ -26,29 +26,20 @@ spec:
               value: "PRFT" # <-- Considera cambiar esto para obtenerlo de un Secret de Kubernetes
             - name: SERVER_PORT
               value: "8083"
-          # --- Probes ajustadas para usar exec ---
+          # --- Probes ajustadas para usar tcpSocket ---
           livenessProbe: # Chequeo de vida: ¿Está la aplicación 'viva'?
-            exec:
-              # Define el comando que se ejecutará dentro del contenedor
-              # Asegúrate de que 'check_health.sh' exista y sea ejecutable dentro de la imagen
-              command:
-                - /bin/sh # O /bin/bash, dependiendo de lo que esté disponible en tu imagen
-                - -c
-                - /app/scripts/check_health.sh # Ruta al script de salud dentro del contenedor
+            tcpSocket:
+              port: 8083 # Verifica si se puede establecer una conexión TCP al puerto 8083
             initialDelaySeconds: 15 # Tiempo inicial de espera antes del primer chequeo (ajusta si es necesario)
             periodSeconds: 10       # Frecuencia de los chequeos
-            timeoutSeconds: 5       # Tiempo máximo para que el comando termine
+            timeoutSeconds: 2       # Tiempo máximo para que la conexión se establezca
             failureThreshold: 3     # Número de fallos consecutivos antes de considerar el pod no saludable
           readinessProbe: # Chequeo de preparación: ¿Está la aplicación lista para recibir tráfico?
-            exec:
-              # Define el comando que se ejecutará dentro del contenedor
-              command:
-                - /bin/sh
-                - -c
-                - /app/scripts/check_health.sh # Puede ser el mismo script o uno diferente
+            tcpSocket:
+              port: 8083 # Verifica si se puede establecer una conexión TCP al puerto 8083
             initialDelaySeconds: 5 # Tiempo inicial de espera (suele ser un poco más que liveness)
             periodSeconds: 10
-            timeoutSeconds: 5
+            timeoutSeconds: 2
             failureThreshold: 3
           # --- Fin de las probes ajustadas ---
           # ... otras configuraciones del contenedor si las hay

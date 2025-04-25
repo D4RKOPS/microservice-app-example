@@ -141,3 +141,5 @@ jobs:
       #     IP=$(kubectl get svc frontend -n microservices -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
       #     echo "🚀 Frontend available at http://$IP"
 
+      - name: List all pods in microservices namespace
+        run: kubectl get pods -n microservices

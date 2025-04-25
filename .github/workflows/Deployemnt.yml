@@ -26,7 +26,7 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # 3. Obtener credenciales AKS
+      # 3. Obtener credenciales AKS  
       - name: Get AKS credentials
         run: |
           az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION_ID }}

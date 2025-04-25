@@ -36,12 +36,12 @@ jobs:
         id: redis-key
         run: |
           REDIS_KEY=$(az redis list-keys \
-            --name microservices-redis \
+            --name microservices-redis20250424 \
             --resource-group microservices-rg \
             --query "primaryKey" -o tsv)
           echo "::add-mask::$REDIS_KEY"
           echo "REDIS_PASSWORD=$REDIS_KEY" >> $GITHUB_ENV
-          
+
       - name: Create Redis Secret
         run: |
           kubectl create secret generic redis-secret \
